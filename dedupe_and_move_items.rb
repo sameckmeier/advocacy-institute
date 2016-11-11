@@ -29,6 +29,7 @@ def run(options)
   puts "Successfully posted items"
 end
 
+# Podio::Client handles authenticating and HTTP requests to the Podio api
 module Podio
   class Client
     def initialize(args)
@@ -100,6 +101,7 @@ module Podio
     end
   end
 
+  # Podio::Items is an interface to the Podio items' api and has class methods for filtering and deduping
   class Items
     def initialize(client)
       @client = client
