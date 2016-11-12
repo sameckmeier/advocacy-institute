@@ -3,12 +3,6 @@ require 'net/http'
 require 'json'
 require 'uri'
 
-AUTH_KEYS = [:username, :password, :client_id, :client_token]
-ITEM_FIELD_TO_DEDUPE = 'title'
-ITEM_FILTER = { 'Scheduling Status' => 'Date confirmed' }
-SCHEDULING_STATUS_FIELD_ID = 133224490
-SCHEDULING_STATUS_VALUE_FILTER = [3]
-
 options = {}
 
 OptionParser.new do |parser|
@@ -38,16 +32,20 @@ OptionParser.new do |parser|
 end.parse!
 
 def run(options)
+  scheduling_status_value_id = 133224490
+  scheduling_status_value_filter = [3]
+  item_field_to_dedupe = 'title'
+
   podio_client = Podio::Client.new(options)
   podio_items = Podio::Items.new(podio_client)
 
   puts "Requesting items\n"
-  filters = { 'filters' => { SCHEDULING_STATUS_FIELD_ID => SCHEDULING_STATUS_VALUE_FILTER }}
+  filters = { 'filters' => { scheduling_status_value_id => scheduling_status_value_filter }}
   items = podio_items.find_all(options[:app_id], filters)
   puts "Successfully requested #{items.count} items\n\n"
 
   puts "Deduping #{items.count} items"
-  items = Podio::Items.dedupe(items, ITEM_FIELD_TO_DEDUPE)
+  items = Podio::Items.dedupe(items, item_field_to_dedupe)
   puts "Successful dedupe -- items count: #{items.count}\n\n"
 
   # puts "Posting items"
@@ -137,7 +135,7 @@ module Podio
       }
     end
 
-    def authentication_headers()
+    def authentication_headers
       { 'Authorization' => "OAuth2 #{@oauth_token}" }
     end
 
@@ -176,12 +174,49 @@ module Podio
       items
     end
 
-    def create(app_id, items)
-      @client.post("item/app/#{app_id}/", body)
+    def clone_to_app(app_id, item)
+      cloned_item_fields = self.class.extract_fields_to_clone(item)
+      create(app_id, cloned_item_fields)
+    end
+
+    def create(app_id, fields)
+      encoded_fields = JSON.generate({ 'fields' => fields })
+      @client.post("item/app/#{app_id}/", encoded_fields)
     end
 
     def self.dedupe(items, field)
       items.uniq { |obj| obj[field] }
+    end
+
+    def self.extract_fields_to_clone(item)
+      cloned = {}
+
+      fields = item['fields']
+      fields.each do |field|
+        k = field['external_id']
+        v = extract_value(field['type'], field['values'][0])
+
+        cloned[k] = v
+      end
+
+      cloned
+    end
+
+    private
+
+    def self.extract_value(type, value)
+      val = value
+
+      case type
+      when 'date'
+        val = { 'start' => val['start'], 'end' => val['end'] }
+      when 'category'
+        val = val['value']['id']
+      else
+        val = val['value']
+      end
+
+      val
     end
   end
 end
