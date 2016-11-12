@@ -25,7 +25,7 @@ def run(options)
   puts "Posting items"
   items.each_with_idex do |item, index|
     puts "********Posting #{index}  #{decoded_json_items.count}"
-    podio_items.post(options[:new_app_id], item)
+    podio_items.create(options[:new_app_id], item)
     puts "********Successfully posted resource to #{slug}\n"
   end
 
@@ -152,7 +152,7 @@ module Podio
       items
     end
 
-    def post(app_id, items)
+    def create(app_id, items)
       @client.post("item/app/#{app_id}/", body)
     end
 
