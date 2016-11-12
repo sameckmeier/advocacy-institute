@@ -1,4 +1,4 @@
-#!/usr/bin/env ruby
+require 'optparse'
 require 'net/http'
 require 'json'
 require 'uri'
@@ -8,6 +8,34 @@ ITEM_FIELD_TO_DEDUPE = 'title'
 ITEM_FILTER = { 'Scheduling Status' => 'Date confirmed' }
 SCHEDULING_STATUS_FIELD_ID = 133224490
 SCHEDULING_STATUS_VALUE_FILTER = [3]
+
+options = {}
+
+OptionParser.new do |parser|
+  parser.on("--email EMAIL", "Ypur podio account email") do |v|
+    options[:email] = v
+  end
+
+  parser.on("--password PASSWORD", "Your podio account password") do |v|
+    options[:password] = v
+  end
+
+  parser.on("--client-id CLIENT-ID", "Your personal podio api client id") do |v|
+    options[:client_id] = v
+  end
+
+  parser.on("--client-secret CLIENT-SECRET", "Your personal podio api client secret") do |v|
+    options[:client_secret] = v
+  end
+
+  parser.on("--app-id APP-ID", "Your podio app id from which you want to extract items") do |v|
+    options[:app_id] = v
+  end
+
+  parser.on("--new-app-id NEW-APP-ID", "Your podio app id that you want to recieve items") do |v|
+    options[:new_app_id] = v
+  end
+end.parse!
 
 def run(options)
   podio_client = Podio::Client.new(options)
@@ -22,12 +50,12 @@ def run(options)
   items = Podio::Items.dedupe(items, ITEM_FIELD_TO_DEDUPE)
   puts "Successful dedupe -- items count: #{items.count}\n\n"
 
-  puts "Posting items"
-  items.each_with_idex do |item, index|
-    puts "********Posting #{index}  #{decoded_json_items.count}"
-    podio_items.create(options[:new_app_id], item)
-    puts "********Successfully posted resource to #{slug}\n"
-  end
+  # puts "Posting items"
+  # items.each_with_idex do |item, index|
+  #   puts "********Posting #{index}  #{decoded_json_items.count}"
+  #   podio_items.create(options[:new_app_id], item)
+  #   puts "********Successfully posted resource to #{slug}\n"
+  # end
 
   puts "Successfully posted items"
 end
@@ -37,12 +65,8 @@ module Podio
   class Client
     def initialize(args)
       @url = 'https://api.podio.com'
-      @username = args[:username]
-      @password = args[:password]
-      @client_id = args[:client_id]
-      @client_secret = args[:client_secret]
       @oauth_token = authenticate({
-        'username' => args[:username],
+        'username' => args[:email],
         'password' => args[:password],
         'client_id' => args[:client_id],
         'client_secret' => args[:client_secret],
@@ -161,3 +185,5 @@ module Podio
     end
   end
 end
+
+run(options)
