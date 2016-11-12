@@ -48,12 +48,12 @@ def run(options)
   items = Podio::Items.dedupe(items, item_field_to_dedupe)
   puts "Successful dedupe -- items count: #{items.count}\n\n"
 
-  # puts "Posting items"
-  # items.each_with_idex do |item, index|
-  #   puts "********Posting #{index}  #{decoded_json_items.count}"
-  #   podio_items.create(options[:new_app_id], item)
-  #   puts "********Successfully posted resource to #{slug}\n"
-  # end
+  puts "Posting items"
+  items.each_with_idex do |item, index|
+    puts "********Posting #{index} of #{items.count}"
+    podio_items.clone_to_app(options[:new_app_id], item)
+    puts "********Successfully posted item\n"
+  end
 
   puts "Successfully posted items"
 end
