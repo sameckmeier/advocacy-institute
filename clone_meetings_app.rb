@@ -51,15 +51,75 @@ def run(options)
   puts "Posting items"
   items.each_with_idex do |item, index|
     puts "********Posting #{index} of #{items.count}"
-    podio_items.clone_to_app(options[:new_app_id], item)
+    new_item = podio_items.clone_to_app(options[:new_app_id], item)
+
+    new_item_title = new_item['fields'].find { |field|  }
+    new_item_date =
+
+    new_task =
     puts "********Successfully posted item\n"
   end
 
   puts "Successfully posted items"
 end
 
-# Podio::Client handles authenticating and HTTP requests to the Podio api
 module Podio
+  class Item
+
+    attr_reader :raw, :id, :app_id
+
+    def initialize(raw)
+      @fields = build(raw['fields'])
+      @app_id = raw['app_item_id']
+      @id = raw['item_id']
+      @raw = raw
+    end
+
+    def method_missing(m, *args, &block)
+      if @fields.keys.include?(m)
+        return @fields[m]
+      else
+        super
+      end
+    end
+
+    def respond_to_missing?(m, include_private = false)
+      @fields.keys.include?(m) || super
+    end
+
+    private
+    def build(fields)
+      keys = []
+      values = []
+      fields.each do |f|
+        keys << key(f['label'])
+        values << value(f['values'][0])
+      end
+
+      Hash[keys.zip(values)]
+    end
+
+    def key(raw_key)
+      key = ""
+
+      key = raw_key.split(' ').delete_if { |str| !str.match(/[\w]/) }
+      key = key.join('_').downcase.to_sym
+
+      key
+    end
+
+    def value(raw_value)
+      val = raw_value
+
+      if raw_value.class == Hash
+        val = raw_value['value'] if raw_value.keys.include?('value')
+      end
+
+      val
+    end
+  end
+
+  # Podio::Client handles authenticating and HTTP requests to the Podio api
   class Client
     def initialize(args)
       @url = 'https://api.podio.com'
@@ -170,7 +230,7 @@ module Podio
         items = @client.get("#{base_slug}/")
       end
 
-      items = JSON.parse(items)['items']
+      items = JSON.parse(items)['items'].map { |raw| Item.new(raw) }
       items
     end
 
@@ -181,7 +241,9 @@ module Podio
 
     def create(app_id, fields)
       encoded_fields = JSON.generate({ 'fields' => fields })
-      @client.post("item/app/#{app_id}/", encoded_fields)
+      raw = @client.post("item/app/#{app_id}/", encoded_fields)
+
+      Item.new(raw)
     end
 
     def self.dedupe(items, field)
@@ -217,6 +279,17 @@ module Podio
       end
 
       val
+    end
+  end
+
+  class Tasks
+    def initialize(client)
+      @client = client
+    end
+
+    def create(fields)
+      encoded_fields = JSON.generate(fields)
+      @client.post("task/", encoded_fields)
     end
   end
 end
