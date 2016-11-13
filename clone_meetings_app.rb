@@ -1,3 +1,4 @@
+require 'time'
 require 'optparse'
 require 'net/http'
 require 'json'
@@ -38,6 +39,7 @@ def run(options)
 
   podio_client = Podio::Client.new(options)
   podio_items = Podio::Items.new(podio_client)
+  podio_tasks = Podio::Tasks.new(podio_client)
 
   puts "Requesting items\n"
   filters = { 'filters' => { scheduling_status_value_id => scheduling_status_value_filter }}
@@ -49,76 +51,22 @@ def run(options)
   puts "Successful dedupe -- items count: #{items.count}\n\n"
 
   puts "Posting items"
-  items.each_with_idex do |item, index|
-    puts "********Posting #{index} of #{items.count}"
-    new_item = podio_items.clone_to_app(options[:new_app_id], item)
+  items.each_with_index do |item, index|
+    puts "********"
+    puts "Posting #{index + 1} of #{items.count}"
 
-    new_item_title = new_item['fields'].find { |field|  }
-    new_item_date =
+    new_item = podio_items.clone_to_app(options[:new_app_id], item.raw)
 
-    new_task =
-    puts "********Successfully posted item\n"
+    puts "Creating task for item\n"
+    new_task = podio_tasks.associate_to_item(new_item)
+    puts "Successfully created task\n"
+    puts "Successfully posted item\n"
   end
 
   puts "Successfully posted items"
 end
 
 module Podio
-  class Item
-
-    attr_reader :raw, :id, :app_id
-
-    def initialize(raw)
-      @fields = build(raw['fields'])
-      @app_id = raw['app_item_id']
-      @id = raw['item_id']
-      @raw = raw
-    end
-
-    def method_missing(m, *args, &block)
-      if @fields.keys.include?(m)
-        return @fields[m]
-      else
-        super
-      end
-    end
-
-    def respond_to_missing?(m, include_private = false)
-      @fields.keys.include?(m) || super
-    end
-
-    private
-    def build(fields)
-      keys = []
-      values = []
-      fields.each do |f|
-        keys << key(f['label'])
-        values << value(f['values'][0])
-      end
-
-      Hash[keys.zip(values)]
-    end
-
-    def key(raw_key)
-      key = ""
-
-      key = raw_key.split(' ').delete_if { |str| !str.match(/[\w]/) }
-      key = key.join('_').downcase.to_sym
-
-      key
-    end
-
-    def value(raw_value)
-      val = raw_value
-
-      if raw_value.class == Hash
-        val = raw_value['value'] if raw_value.keys.include?('value')
-      end
-
-      val
-    end
-  end
-
   # Podio::Client handles authenticating and HTTP requests to the Podio api
   class Client
     def initialize(args)
@@ -213,6 +161,61 @@ module Podio
     end
   end
 
+  # Podio::Item is a wrapper for raw items
+  class Item
+    attr_reader :raw, :id, :app_id
+
+    def initialize(raw)
+      @fields = build(raw['fields'])
+      @app_id = raw['app_item_id']
+      @id = raw['item_id']
+      @raw = raw
+    end
+
+    def method_missing(m, *args, &block)
+      if @fields.keys.include?(m)
+        return @fields[m]
+      else
+        super
+      end
+    end
+
+    def respond_to_missing?(m, include_private = false)
+      @fields.keys.include?(m) || super
+    end
+
+    private
+    def build(fields)
+      keys = []
+      values = []
+      fields.each do |f|
+        keys << key(f['label'])
+        values << value(f['values'][0])
+      end
+
+      Hash[keys.zip(values)]
+    end
+
+    def key(raw_key)
+      key = ""
+
+      key = raw_key.split(' ').delete_if { |str| !str.match(/[\w]/) }
+      key = key.join('_').downcase.to_sym
+
+      key
+    end
+
+    def value(raw_value)
+      val = raw_value
+
+      if raw_value.class == Hash
+        val = raw_value['value'] if raw_value.keys.include?('value')
+      end
+
+      val
+    end
+  end
+
   # Podio::Items is an interface to the Podio items' api and has class methods for filtering and deduping
   class Items
     def initialize(client)
@@ -242,12 +245,13 @@ module Podio
     def create(app_id, fields)
       encoded_fields = JSON.generate({ 'fields' => fields })
       raw = @client.post("item/app/#{app_id}/", encoded_fields)
+      raw = JSON.parse(raw)
 
-      Item.new(raw)
+      item = Item.new(raw)
     end
 
     def self.dedupe(items, field)
-      items.uniq { |obj| obj[field] }
+      items.uniq { |item| item.raw[field] }
     end
 
     def self.extract_fields_to_clone(item)
@@ -282,6 +286,7 @@ module Podio
     end
   end
 
+  # Podio::Tasks is an interface to the Podio tasks' api and associating with an item
   class Tasks
     def initialize(client)
       @client = client
@@ -290,6 +295,21 @@ module Podio
     def create(fields)
       encoded_fields = JSON.generate(fields)
       @client.post("task/", encoded_fields)
+    end
+
+    def associate_to_item(item)
+      title = "Create Agenda for #{item.raw['title']}"
+      time = Time.parse(item.time_date_of_meeting['start']) - (60 * 60 * 24 * 7)
+
+      fields = {
+        'text' => title,
+        'private' => false,
+        'ref_type' => "item",
+        'ref_id' => item.id,
+        'due_date' => time.strftime("%Y-%m-%d")
+      }
+
+      create(fields)
     end
   end
 end
