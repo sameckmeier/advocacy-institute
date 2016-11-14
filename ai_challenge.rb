@@ -1,3 +1,4 @@
+require 'csv'
 require 'time'
 require 'optparse'
 require 'net/http'
@@ -7,7 +8,7 @@ require 'uri'
 options = {}
 
 OptionParser.new do |parser|
-  parser.on("--email EMAIL", "Ypur podio account email") do |v|
+  parser.on("--email EMAIL", "Your podio account email") do |v|
     options[:email] = v
   end
 
@@ -29,6 +30,10 @@ OptionParser.new do |parser|
 
   parser.on("--new-app-id NEW-APP-ID", "Your podio app id that you want to recieve items") do |v|
     options[:new_app_id] = v
+  end
+
+  parser.on("--path-to-import PATH", "Path to import file") do |v|
+    options[:path_to_import] = v
   end
 end.parse!
 
@@ -310,6 +315,83 @@ module Podio
       }
 
       create(fields)
+    end
+  end
+
+  # Podio::Importer reads a csv, builds item fields, and posts them to provided app 
+  class Importer
+    def initialize(client, podio_items, csv_path, app_id)
+      @client = client
+      @podio_items = podio_items
+      @csv_path = csv_path
+      @app_id = app_id
+    end
+
+    def run()
+      app = app()
+
+      arrays = read_csv()
+      keys = arrays.shift
+      vals = arrays
+
+      app_fields = app_fields(app['fields'])
+      items = items(keys, vals, app_fields)
+
+      import_csv(items)
+    end
+
+    private
+
+    def import_csv(items)
+      items.each do |item|
+        @podio_items.create(@app_id, item)
+      end
+    end
+
+    def read_csv
+      CSV.read(@csv_path)
+    end
+
+    def app
+      encoded_app = @client.get("app/#{@app_id}")
+      JSON.parse(encoded_app)
+    end
+
+    def items(keys, val_arrays, app_fields)
+      items = []
+
+      val_arrays.each { |arr| items << item(keys, arr, app_fields) unless arr.compact.empty? }
+
+      items
+    end
+
+    def item(keys, values, app_fields)
+      item = {}
+
+      unless values.compact.empty?
+        keys.each_with_index do |k,i|
+          external_id = app_fields[k][:id]
+          type = app_fields[k][:type]
+
+          value = type == 'number' ? Float(values[i]) : values[i]
+          item[external_id] = value
+        end
+      end
+
+      item
+    end
+
+    def app_fields(fields)
+      ids = {}
+
+      fields.each do |field|
+        label = field['config']['label']
+        type = field['type']
+        id = field['external_id']
+        ids[label] = { id: id, type: type }
+      end
+
+      ids
     end
   end
 end
