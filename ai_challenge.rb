@@ -318,7 +318,7 @@ module Podio
     end
   end
 
-  # Podio::Importer reads a csv, builds item fields, and posts them to provided app 
+  # Podio::Importer reads a csv, builds item fields, and posts them to provided app
   class Importer
     def initialize(client, podio_items, csv_path, app_id)
       @client = client
@@ -368,30 +368,28 @@ module Podio
     def item(keys, values, app_fields)
       item = {}
 
-      unless values.compact.empty?
-        keys.each_with_index do |k,i|
-          external_id = app_fields[k][:id]
-          type = app_fields[k][:type]
+      keys.each_with_index do |k,i|
+        external_id = app_fields[k][:id]
+        type = app_fields[k][:type]
 
-          value = type == 'number' ? Float(values[i]) : values[i]
-          item[external_id] = value
-        end
+        value = type == 'number' ? Float(values[i]) : values[i]
+        item[external_id] = value
       end
 
       item
     end
 
     def app_fields(fields)
-      ids = {}
+      fields_mapping = {}
 
       fields.each do |field|
         label = field['config']['label']
         type = field['type']
         id = field['external_id']
-        ids[label] = { id: id, type: type }
+        fields_mapping[label] = { id: id, type: type }
       end
 
-      ids
+      fields_mapping
     end
   end
 end
