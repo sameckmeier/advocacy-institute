@@ -1,0 +1,30 @@
+.Chart {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 25px;
+}
+
+.Chart-data-toggles {
+  display: flex;
+  justify-content: space-between;
+  width: 50%;
+  margin-top: 25px;
+}
+
+.Chart-data-toggle {
+  display: flex;
+  justify-content: center;
+  background-color: #c6bcde;
+  height: 75px;
+  width: 100px;
+  font-weight: 200;
+  font-size: 14px;
+  border: none;
+  outline:none;
+
+  &:hover {
+    background-color: lighten(#c6bcde, 5%);
+  }
+}
