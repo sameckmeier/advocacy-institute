@@ -51,18 +51,6 @@ class PodioApi {
   }
 }
 
-export const fieldsByType = (items, type) => {
-  const filteredFields = [];
-
-  let fields = [];
-  items.forEach(item => fields = fields.concat(...item.fields))
-  fields.forEach(field => {
-    if (field.type === type) {  filteredFields.push(field) }
-  })
-
-  return filteredFields;
-};
-
 const mapVertices = fields => {
   const mapped = {};
   let index = fields.length - 1;
@@ -89,25 +77,46 @@ const mapVertices = fields => {
   return mapped;
 };
 
+const buildVertices = xYValues => {
+  const vertices = [];
+
+  Object.keys(xYValues).forEach( xYValue => {
+    vertices.push({
+      x: xYValue,
+      y: xYValues[xYValue],
+    })
+  })
+
+  return vertices;
+};
+
+const buildD3GraphData = (mappedVerticeLabel, mappedVertices) => {
+  const d3GraphData = {};
+  const xYValues = mappedVertices[mappedVerticeLabel];
+
+  d3GraphData.fieldName = mappedVerticeLabel;
+  d3GraphData.vertices = buildVertices(xYValues);
+
+  return d3GraphData;
+};
+
+export const fieldsByType = (items, type) => {
+  const filteredFields = [];
+
+  let fields = [];
+  items.forEach(item => fields = fields.concat(...item.fields))
+  fields.forEach(field => {
+    if (field.type === type) {  filteredFields.push(field) }
+  })
+
+  return filteredFields;
+};
+
 export const d3Format = vertices => {
-  const formatted = [];
   const mappedVertices = mapVertices(vertices);
 
-  Object.keys(mappedVertices).forEach ( mappedVerticeLabel => {
-    const d3GraphData = {
-      fieldName: mappedVerticeLabel,
-      vertices: [],
-    };
-
-    const xYValues = mappedVertices[mappedVerticeLabel];
-    Object.keys(xYValues).forEach( xYValue => {
-      d3GraphData.vertices.push({
-        x: xYValue,
-        y: xYValues[xYValue],
-      })
-    })
-
-    formatted.push(d3GraphData);
+  const formatted = Object.keys(mappedVertices).map ( mappedVerticeLabel => {
+    return buildD3GraphData(mappedVerticeLabel, mappedVertices);
   })
 
   return formatted;
